@@ -98,6 +98,13 @@ class ONVIFService(object):
             settings.strict = False
             settings.xml_huge_tree = True
             self.zeep_client = ClientType(wsdl=url, wsse=wsse, transport=transport, settings=settings)
+            self.zeep_client.set_ns_prefix('tds', 'http://www.onvif.org/ver10/device/wsdl')
+            self.zeep_client.set_ns_prefix('tev', 'http://www.onvif.org/ver10/events/wsdl')
+            self.zeep_client.set_ns_prefix('timg', 'http://www.onvif.org/ver20/imaging/wsdl')
+            self.zeep_client.set_ns_prefix('tmd', 'http://www.onvif.org/ver10/deviceIO/wsdl')
+            self.zeep_client.set_ns_prefix('tptz', 'http://www.onvif.org/ver20/ptz/wsdl')
+            self.zeep_client.set_ns_prefix('ttr', 'http://www.onvif.org/ver10/media/wsdl')
+            self.zeep_client.set_ns_prefix('ter', 'http://www.onvif.org/ver10/error')
         else:
             self.zeep_client = zeep_client
         self.ws_client = self.zeep_client.create_service(binding_name, self.xaddr)
