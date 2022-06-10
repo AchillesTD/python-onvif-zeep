@@ -192,7 +192,7 @@ class ONVIFCamera(object):
     def __init__(self, host, port, user, passwd,
                  wsdl_dir=os.path.join(os.path.dirname(os.path.dirname(__file__)),
                                        "wsdl"),
-                 encrypt=True, daemon=False, no_cache=False, adjust_time=False,
+                 encrypt=True, daemon=False, no_cache=False, adjust_time=False, event_pullpoint=True,
                  transport=None):
         os.environ.pop('http_proxy', None)
         os.environ.pop('https_proxy', None)
@@ -205,6 +205,7 @@ class ONVIFCamera(object):
         self.daemon = daemon
         self.no_cache = no_cache
         self.adjust_time = adjust_time
+        self.event_pullpoint = event_pullpoint
         self.transport = transport
 
         # Active service client container
@@ -242,8 +243,9 @@ class ONVIFCamera(object):
         with self.services_lock:
             try:
                 self.event = self.create_events_service()
-                self.xaddrs['http://www.onvif.org/ver10/events/wsdl/PullPointSubscription'] = \
-                    self.event.CreatePullPointSubscription().SubscriptionReference.Address._value_1
+                if self.event_pullpoint:
+                    self.xaddrs['http://www.onvif.org/ver10/events/wsdl/PullPointSubscription'] = \
+                        self.event.CreatePullPointSubscription().SubscriptionReference.Address._value_1
             except Exception:
                 pass
 
