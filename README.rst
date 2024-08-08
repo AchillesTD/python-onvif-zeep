@@ -3,6 +3,9 @@ python-onvif-zeep
 
 ONVIF Client Implementation in Python
 
+This README includes both the original instructions and details about the enhancements made in my **forked version**.
+
+
 Dependencies
 ------------
 `zeep <http://docs.python-zeep.org>`_ >= 3.0.0
@@ -157,6 +160,18 @@ Batch mode
     ONVIF >>> True: {}
     ONVIF >>> True: {'FromDHCP': False, 'Name': NewHostname}
 
+Forked Version Updates
+~~~~~~~~~~~~~~~~~~~~~~
+- **Enhanced Device Interaction:**
+    - Retrieve and display detailed device capabilities (information, status).
+- **Streamlined RTSP URL Retrieval:**
+    - Easily fetch and display RTSP stream URLs for live feeds.
+- **Camera Status Monitoring:**
+    - Real-time status updates (active/inactive) with notifications.
+- **Background Polling with Threading:**
+    - Efficient, non-blocking monitoring of camera statuses.
+- **Flexible Configuration with Environment Variables:**
+    - Easy setup using environment variables for various settings.
 References
 ----------
 
