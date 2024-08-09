@@ -172,6 +172,10 @@ Forked Version Updates
     - Efficient, non-blocking monitoring of camera statuses.
 - **Flexible Configuration with Environment Variables:**
     - Easy setup using environment variables for various settings.
+- **System Log Retrieval and Event Service Exploration:**
+    - Periodically retrieve and store system logs.
+    - List available operations for event service interaction.
+    - **(Provisional)** Commented-out code for potential future event subscription handling.
 References
 ----------
 
