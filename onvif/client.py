@@ -98,6 +98,13 @@ class ONVIFService(object):
             settings.strict = False
             settings.xml_huge_tree = True
             self.zeep_client = ClientType(wsdl=url, wsse=wsse, transport=transport, settings=settings)
+            self.zeep_client.set_ns_prefix('tds', 'http://www.onvif.org/ver10/device/wsdl')
+            self.zeep_client.set_ns_prefix('tev', 'http://www.onvif.org/ver10/events/wsdl')
+            self.zeep_client.set_ns_prefix('timg', 'http://www.onvif.org/ver20/imaging/wsdl')
+            self.zeep_client.set_ns_prefix('tmd', 'http://www.onvif.org/ver10/deviceIO/wsdl')
+            self.zeep_client.set_ns_prefix('tptz', 'http://www.onvif.org/ver20/ptz/wsdl')
+            self.zeep_client.set_ns_prefix('ttr', 'http://www.onvif.org/ver10/media/wsdl')
+            self.zeep_client.set_ns_prefix('ter', 'http://www.onvif.org/ver10/error')
         else:
             self.zeep_client = zeep_client
         self.ws_client = self.zeep_client.create_service(binding_name, self.xaddr)
@@ -192,7 +199,7 @@ class ONVIFCamera(object):
     def __init__(self, host, port, user, passwd,
                  wsdl_dir=os.path.join(os.path.dirname(os.path.dirname(__file__)),
                                        "wsdl"),
-                 encrypt=True, daemon=False, no_cache=False, adjust_time=False,
+                 encrypt=True, daemon=False, no_cache=False, adjust_time=False, event_pullpoint=True,
                  transport=None):
         os.environ.pop('http_proxy', None)
         os.environ.pop('https_proxy', None)
@@ -205,6 +212,7 @@ class ONVIFCamera(object):
         self.daemon = daemon
         self.no_cache = no_cache
         self.adjust_time = adjust_time
+        self.event_pullpoint = event_pullpoint
         self.transport = transport
 
         # Active service client container
@@ -231,6 +239,18 @@ class ONVIFCamera(object):
         self.xaddrs = {}
         capabilities = self.devicemgmt.GetCapabilities({'Category': 'All'})
         for name in capabilities:
+            try:
+                retrived_address=capabilities[name].XAddr
+                right=retrived_address.split("//")[1]
+                retrived_url=right.split("/")[0]
+                ip_address=retrived_url.split(":")[0]
+                port_address = retrived_url.split(":")[1]
+                if (self.host != ip_address or self.port != port_address):
+                    remaining=right.split("/")[1]
+                    new_address="http://"+self.host+":"+str(self.port)+"/"+right.split("/")[1]+"/"+right.split("/")[2]
+                    capabilities[name].XAddr=new_address
+            except:
+                pass
             capability = capabilities[name]
             try:
                 if name.lower() in SERVICES and capability is not None:
@@ -242,8 +262,9 @@ class ONVIFCamera(object):
         with self.services_lock:
             try:
                 self.event = self.create_events_service()
-                self.xaddrs['http://www.onvif.org/ver10/events/wsdl/PullPointSubscription'] = \
-                    self.event.CreatePullPointSubscription().SubscriptionReference.Address._value_1
+                if self.event_pullpoint:
+                    self.xaddrs['http://www.onvif.org/ver10/events/wsdl/PullPointSubscription'] = \
+                        self.event.CreatePullPointSubscription().SubscriptionReference.Address._value_1
             except Exception:
                 pass
 
