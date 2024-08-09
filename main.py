@@ -8,7 +8,7 @@ import threading
 
 # NVR Configuration
 IP = getenv('IP')
-PORT = getenv('PORT')
+PORT =getenv('PORT')
 USER = getenv('USER')
 PASS = getenv('PASS')
 WSDL_DIR = path.join(getcwd(), 'wsdl')
@@ -22,10 +22,59 @@ def get_device_service_capabilities(mycam):
         print(f"Error retrieving device service capabilities: {e}")
         return None
 
-def get_event_service_capabilities(mycam):
-    event_service = mycam.create_events_service()
-    capabilities = event_service.GetServiceCapabilities()
-    return capabilities
+def list_available_operations(event_service):
+    try:
+        operations = dir(event_service)
+        print("Available operations in the event service:")
+        for op in operations:
+            if not op.startswith('_'):
+                print(f"- {op}")
+    except Exception as e:
+        print(f"Error listing operations: {e}")
+
+
+# def create_subscription(event_service):
+#     try:
+#         # Create a PullPoint subscription
+#         response = event_service.CreatePullPointSubscription()
+#         print(f"Subscription created: {response}")
+#         return response
+#     except Exception as e:
+#         print(f"Error creating subscription: {e}")
+#         return None
+
+
+def retrieve_system_logs(mycam):
+    try:
+        devicemgmt = mycam.create_devicemgmt_service()
+        log_type = 'System'  # Replace with the appropriate log type if necessary
+        logs = devicemgmt.GetSystemLog({'LogType': log_type})
+
+        # Check the logs object and its attributes
+        log_content = getattr(logs, 'String', None)
+
+        if log_content:
+            return log_content
+        else:
+            return None
+    except ONVIFError as e:
+        print(f"Error retrieving system log: {e}")
+        return None
+
+def log_updater(mycam, stop_event):
+    last_log = ""
+    while not stop_event.is_set():
+        try:
+            new_log_content = retrieve_system_logs(mycam)
+            if new_log_content and new_log_content != last_log:
+                with open('system_log.txt', 'w') as f:
+                    f.write(new_log_content)
+                last_log = new_log_content
+                print("System log updated.")
+        except ONVIFError as e:
+            print(f"Error retrieving system log: {e}")
+
+        time.sleep(10)  # Poll every 10 seconds
 
 def get_rtsp_urls(mycam, profiles):
     rtsp_urls = {}
@@ -40,6 +89,19 @@ def get_rtsp_urls(mycam, profiles):
         })
         rtsp_urls[profile.token] = configuration.Uri
     return rtsp_urls
+
+def get_event_service_capabilities(mycam):
+    event_service = mycam.create_events_service()
+    capabilities = event_service.GetServiceCapabilities()
+    return capabilities
+
+def get_rule_support(mycam, event_service_capabilities):
+    return event_service_capabilities.WSPullPointSupport and event_service_capabilities.WSSubscriptionPolicySupport
+
+def handle_event(event):
+    event_time = event.UtcTime
+    event_type = event.TopicExpression.Topic
+    print(f"\n[Event] Time: {event_time}, Type: {event_type}")
 
 def get_camera_statuses(profiles, video_sources):
     active_cameras = set()
@@ -86,7 +148,7 @@ if __name__ == "__main__":
     try:
         # Connect to ONVIF Camera
         mycam = ONVIFCamera(IP, PORT, USER, PASS, WSDL_DIR)
-        print("Connected to DVR successfully!")
+        print("Connected to NVR successfully!")
 
         # Get Device Service Capabilities
         device_capabilities = get_device_service_capabilities(mycam)
@@ -104,6 +166,10 @@ if __name__ == "__main__":
         device_info = devicemgmt.GetDeviceInformation()
         system_date_and_time = devicemgmt.GetSystemDateAndTime()
 
+        # list available operations
+        event_service = mycam.create_events_service()
+        list_available_operations(event_service)
+
         print("\n--- Device Information ---")
         print(f"- Manufacturer: {device_info.Manufacturer}")
         print(f"- Model: {device_info.Model}")
@@ -114,6 +180,16 @@ if __name__ == "__main__":
         if system_date_and_time and system_date_and_time.UTCDateTime:
             print(f"- Current Time: {system_date_and_time.UTCDateTime.Time}")
             print(f"- Current Date: {system_date_and_time.UTCDateTime.Date}")
+
+        # # Create a subscription and get the reference
+        # subscription_response = create_subscription(event_service)
+        # subscription_reference = subscription_response.SubscriptionReference if subscription_response else None
+
+        # Retrieve and update system logs
+        stop_event = threading.Event()
+        log_thread = threading.Thread(target=log_updater, args=(mycam, stop_event))
+        log_thread.daemon = True
+        log_thread.start()
 
         # Get Initial Camera Statuses
         media_service = mycam.create_media_service()
@@ -143,9 +219,14 @@ if __name__ == "__main__":
             else:
                 print(f"- {profile.Name} (Token: {profile.token}): {rtsp_url}")
 
+        # Create all required ONVIF services before subscribing to events
+        mycam.create_events_service()
+        # subscribe_to_events(mycam)
+
         while True:
             time.sleep(60)  # Main thread keeps running
 
     except (ONVIFError, zeep.exceptions.Fault, ConnectionError) as e:
         print(f"Fatal ONVIF Error: {e}")
+        stop_event.set()  # Stop the log updating thread in case of fatal errors
         stop_polling.set()  # Stop the polling thread in case of fatal errors
